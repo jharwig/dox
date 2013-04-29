@@ -41,7 +41,8 @@ module.exports = {
       version.description.full.should.equal('<p>Library version.</p>');
       version.tags.should.have.length(2);
       version.tags[0].type.should.equal('type');
-      version.tags[0].types.should.eql(['String']);
+      version.tags[0].types.name.should.eql('String');
+      version.tags[0].types.matcher.should.eql('name');
       version.tags[1].type.should.equal('api');
       version.tags[1].visibility.should.equal('public');
       version.ctx.type.should.equal('property');
@@ -51,15 +52,26 @@ module.exports = {
 
       var parse = comments.shift();
       parse.description.summary.should.equal('<p>Parse the given <code>str</code>.</p>');
-      parse.description.body.should.equal('<h2>Examples</h2>\n\n<pre><code>parse(str)\n// =&amp;gt; "wahoo"\n</code></pre>');
-      parse.description.full.should.equal('<p>Parse the given <code>str</code>.</p>\n\n<h2>Examples</h2>\n\n<pre><code>parse(str)\n// =&amp;gt; "wahoo"\n</code></pre>');
+      parse.description.body.should.equal('<h2>Examples</h2>\n\n<pre><code>parse(str)\n// =&gt; "wahoo"\n</code></pre>');
+      parse.description.full.should.equal('<p>Parse the given <code>str</code>.</p>\n\n<h2>Examples</h2>\n\n<pre><code>parse(str)\n// =&gt; "wahoo"\n</code></pre>');
       parse.tags[0].type.should.equal('param');
       parse.tags[0].name.should.equal('str');
       parse.tags[0].description.should.equal('to parse');
-      parse.tags[0].types.should.eql(['String', 'Buffer']);
+      parse.tags[0].types.matcher.should.eql('union');
+      parse.tags[0].types.subtypes.length.should.eql(2);
+      parse.tags[0].types.subtypes[0].matcher.should.eql("name");
+      parse.tags[0].types.subtypes[0].name.should.eql("String");
+      parse.tags[0].types.subtypes[1].matcher.should.eql("name");
+      parse.tags[0].types.subtypes[1].name.should.eql("Buffer");
       parse.tags[1].type.should.equal('return');
-      parse.tags[1].types.should.eql(['String']);
+      parse.tags[1].types.matcher.should.eql('name');
+      parse.tags[1].types.name.should.eql('String');
       parse.tags[2].visibility.should.equal('public');
+      parse.ctx.type.should.equal('method');
+      parse.ctx.receiver.should.equal('exports');
+      parse.ctx.name.should.equal('parse');
+      parse.ctx.string.should.equal('exports.parse()');
+      
       done();
     });
   },
@@ -123,16 +135,6 @@ module.exports = {
       done();
     });
   },
-
-  'test .parseComments() tags with tabs': function (done) {
-    fixture('d-tabs.js', function (err, str) {
-      var comments = dox.parseComments(str)
-         , first = comments.shift();
-
-      first.tags.should.have.length(4);
-      first.description.full.should.equal('<p>Parse tag type string "{Array|Object}" etc.</p>');
-      first.description.summary.should.equal('<p>Parse tag type string "{Array|Object}" etc.</p>');
-      first.description.body.should.equal('');
       first.ctx.type.should.equal('method');
       first.ctx.receiver.should.equal('exports');
       first.ctx.name.should.equal('parseTagTypes');
@@ -141,7 +143,7 @@ module.exports = {
     });
   },
 
-  'test .parseComments() prototypes': function (done){
+  'test .parseComments() tagTypes': function (done){
     fixture('prototypes.js', function(err, str){
       var comments = dox.parseComments(str)
 
@@ -202,6 +204,45 @@ module.exports = {
       comments[0].description.body.should.include('<h2>Some examples</h2>');
       comments[0].description.body.should.not.include('<h2>for example</h2>');
       comments[0].description.body.should.include('<h2>Some longer thing for example</h2>');
+      done();
+    });
+  },
+
+  'test .parseComments() literal': function(done){
+    fixture('literal.js', function(err, str){
+      var comments = dox.parseComments(str);
+      
+      var addMethod = comments.shift();
+      addMethod.ctx.type.should.equal('method');
+      addMethod.ctx.name.should.equal('add');
+      addMethod.ctx.string.should.equal("add()");
+
+      var subMethod = comments.shift();
+      subMethod.ctx.type.should.equal('method');
+      subMethod.ctx.name.should.equal('subtract');
+      subMethod.ctx.string.should.equal("subtract()");
+      
+      var property = comments.shift();
+      property.ctx.type.should.equal('property');
+      property.ctx.name.should.equal('count');
+      property.ctx.value.should.equal("42");
+      property.ctx.string.should.equal('count');
+
+      comments.shift();
+      
+      var lendedMethod = comments.shift();
+      lendedMethod.ctx.type.should.equal('method');
+      lendedMethod.ctx.name.should.equal('add');
+      lendedMethod.ctx.string.should.equal("add()");
+      lendedMethod.lends.should.equal("User.prototype");
+      
+      var lendedProperty = comments.shift();
+      lendedProperty.ctx.type.should.equal('property');
+      lendedProperty.ctx.name.should.equal('count');
+      lendedProperty.ctx.value.should.equal("42");
+      lendedProperty.ctx.string.should.equal('count');
+      lendedProperty.lends.should.equal("User.prototype");
+
       done();
     });
   },
@@ -285,21 +326,28 @@ module.exports = {
   'test .parseTag() @type': function(){
     var tag = dox.parseTag('@type {String}');
     tag.type.should.equal('type');
-    tag.types.should.eql(['String']);
+    tag.types.name.should.eql('String');
+    tag.types.matcher.should.eql('name');
   },
 
   'test .parseTag() @param': function(){
     var tag = dox.parseTag('@param {String|Buffer}');
     tag.type.should.equal('param');
-    tag.types.should.eql(['String', 'Buffer']);
-    tag.name.should.equal('');
-    tag.description.should.equal('');
+    tag.types.matcher.should.eql('union');
+    tag.types.subtypes.length.should.eql(2);
+    tag.types.subtypes[0].matcher.should.eql("name");
+    tag.types.subtypes[0].name.should.eql("String");
+    tag.types.subtypes[1].matcher.should.eql("name");
+    tag.types.subtypes[1].name.should.eql("Buffer");
+    should.not.exist(tag.name);
+    should.not.exist(tag.description);
   },
 
   'test .parseTag() @return': function(){
     var tag = dox.parseTag('@return {String} a normal string');
     tag.type.should.equal('return');
-    tag.types.should.eql(['String']);
+    tag.types.matcher.should.eql('name');
+    tag.types.name.should.eql('String');
     tag.description.should.equal('a normal string');
   },
 
@@ -332,6 +380,110 @@ module.exports = {
     var tag = dox.parseTag('@hello universe is better than world');
     tag.type.should.equal('hello');
     tag.string.should.equal('universe is better than world');
+  },
+
+  'test .parseTagTypes() {boolean}': function(){
+    var result = dox.parseTagTypes('{boolean}');
+    result.matcher.should.equal('name');
+    result.name.should.equal('boolean');
+  },
+  'test .parseTagTypes() {Window}': function(){
+    var result = dox.parseTagTypes('{Window}');
+    result.matcher.should.equal('name');
+    result.name.should.equal('Window');
+  },
+  'test .parseTagTypes() {goog.ui.Menu}': function(){
+    var result = dox.parseTagTypes('{goog.ui.Menu}');
+    result.matcher.should.equal('name');
+    result.name.should.equal('goog.ui.Menu');
+  },
+  'test .parseTagTypes() {Array}': function(){
+    var result = dox.parseTagTypes('{Array}');
+    result.matcher.should.equal('array');
+    should.not.exist(result.elementType);
+  },
+  'test .parseTagTypes() {Array.<string>}': function(){
+    var result = dox.parseTagTypes('{Array.<string>}');
+    result.matcher.should.equal('array');
+    should.exist(result.elementType);
+    result.elementType.matcher.should.equal('name');
+    result.elementType.name.should.equal('string');
+  },
+  'test .parseTagTypes() {Object.<string, number>}': function(){
+    var result = dox.parseTagTypes('{Object.<string, number>}');
+    result.matcher.should.equal('map');
+    should.exist(result.keyType);
+    result.keyType.matcher.should.equal('name');
+    result.keyType.name.should.equal('string');
+    should.exist(result.valueType);
+    result.valueType.matcher.should.equal('name');
+    result.valueType.name.should.equal('number');
+  },
+  'test .parseTagTypes() {(number|boolean)}': function(){
+    var result = dox.parseTagTypes('{(number|boolean)}');
+    result.matcher.should.equal('union');
+    result.subtypes.length.should.equal(2);
+    result.subtypes[0].matcher.should.equal('name');
+    result.subtypes[0].name.should.equal('number');
+    result.subtypes[1].matcher.should.equal('name');
+    result.subtypes[1].name.should.equal('boolean');
+  },
+  'test .parseTagTypes() {{myNum: number, myObject}}': function(){
+    var result = dox.parseTagTypes('{{myNum: number, myObject}}');
+    result.matcher.should.equal('record');
+    result.properties.length.should.equal(2);
+    result.properties[0].name.should.equal('myNum');
+    should.exist(result.properties[0].types);
+    result.properties[0].types.matcher.should.equal('name');
+    result.properties[0].types.name.should.equal('number');
+    result.properties[1].name.should.equal('myObject');
+    should.not.exist(result.properties[1].types);
+  },
+  'test .parseTagTypes() {?number}': function(){
+    var result = dox.parseTagTypes('{?number}');
+    result.matcher.should.equal('name');
+    result.name.should.equal('number');
+    result.nullable.should.equal(true);
+  },
+  'test .parseTagTypes() {!Object}': function(){
+    var result = dox.parseTagTypes('{!Object}');
+    result.matcher.should.equal('name');
+    result.name.should.equal('Object');
+    result.nullable.should.equal(false);
+  },
+  'test .parseTagTypes() {function(string, ...number): number}': function(){
+    var result = dox.parseTagTypes('{function(string, ...number): number}');
+    result.matcher.should.equal('function');
+    result.args.length.should.equal(2);
+    result.args[0].matcher.should.equal('name');
+    result.args[0].name.should.equal('string');
+    result.args[1].matcher.should.equal('variable');
+    should.exist(result.args[1].types);
+    result.args[1].types.matcher.should.equal('name');
+    result.args[1].types.name.should.equal('number');
+    result.returnType.matcher.should.equal('name');
+    result.returnType.name.should.equal('number');
+  },
+  'test .parseTagTypes() {...number}': function(){
+    var result = dox.parseTagTypes('{...number}');
+    result.matcher.should.equal('variable');
+    should.exist(result.types);
+    result.types.matcher.should.equal('name');
+    result.types.name.should.equal('number');
+  },
+  'test .parseTagTypes() {number=}': function(){
+    var result = dox.parseTagTypes('{number=}');
+    result.matcher.should.equal('name');
+    result.name.should.equal('number');
+    result.optional.should.equal(true);
+  },
+  'test .parseTagTypes() {*}': function(){
+    var result = dox.parseTagTypes('{*}');
+    result.matcher.should.equal('any');
+  },
+  'test .parseTagTypes() {?}': function(){
+    var result = dox.parseTagTypes('{?}');
+    result.matcher.should.equal('unknown');
   },
 
   'test .parseComments() code with no comments': function(done){
